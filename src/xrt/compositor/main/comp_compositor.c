@@ -813,9 +813,15 @@ compositor_init_vulkan(struct comp_compositor *c)
  *
  */
 
-// ALVR Vision Pro streaming target — weak symbol, resolved when drv_alvr is linked.
-// Defined strongly in alvr_target.cpp; NULL when ALVR is not linked.
-__attribute__((weak)) const struct comp_target_factory *comp_target_factory_alvr_ptr = NULL;
+// ALVR factory pointer — set by alvr_register_target_factory() called from
+// the service entry point after all libs are linked. NULL = ALVR not active.
+static const struct comp_target_factory *comp_target_factory_alvr_registered = NULL;
+
+void
+comp_compositor_register_alvr_factory(const struct comp_target_factory *ctf)
+{
+	comp_target_factory_alvr_registered = ctf;
+}
 
 const struct comp_target_factory *ctfs_static[] = {
 #if defined VK_USE_PLATFORM_WAYLAND_KHR && defined XRT_HAVE_WAYLAND_DIRECT
@@ -845,8 +851,6 @@ const struct comp_target_factory *ctfs_static[] = {
     &comp_target_factory_debug_image,
 };
 
-// Build the runtime factory list, prepending ALVR if it was linked in.
-// ctfs_alvr_buf has room for the weak ALVR pointer + all static entries.
 static const struct comp_target_factory *ctfs_alvr_buf[ARRAY_SIZE(ctfs_static) + 1];
 static const struct comp_target_factory **ctfs = ctfs_static;
 static size_t ctfs_count = ARRAY_SIZE(ctfs_static);
@@ -854,8 +858,8 @@ static size_t ctfs_count = ARRAY_SIZE(ctfs_static);
 static void
 build_ctfs_list(void)
 {
-	if (comp_target_factory_alvr_ptr != NULL) {
-		ctfs_alvr_buf[0] = comp_target_factory_alvr_ptr;
+	if (comp_target_factory_alvr_registered != NULL) {
+		ctfs_alvr_buf[0] = comp_target_factory_alvr_registered;
 		for (size_t i = 0; i < ARRAY_SIZE(ctfs_static); i++)
 			ctfs_alvr_buf[i + 1] = ctfs_static[i];
 		ctfs       = ctfs_alvr_buf;
